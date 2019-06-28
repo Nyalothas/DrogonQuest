@@ -3,19 +3,25 @@ var DrogonQuest = {
 	init: function () {
 
 		var
+			/**
+			 * Drogon starting x coord position
+			 */
 			x = 100
+
+			/**
+			 * Drogon starting y coord position
+			 */
 			, y = 60
 
 			/**
-			 * Drogon body - pre-baked
+			 * Drogon body
 			 */
-			, drogon = [[x, y], [80, y], [y, y]]
+			, drogon
 
 			/**
 			 * Drogon position
-			 * Initialized to calculated coords
 			 */
-			, drogonPosition = [x, y]
+			, drogonPosition
 
 			/**
 			 * Drogon head image ref
@@ -35,7 +41,7 @@ var DrogonQuest = {
 			/**
 			 * Total ammount of goats roasted
 			 */
-			, eatenGoats = 0
+			, eatenGoats
 
 			/**
 			 * Possible facing directions
@@ -48,9 +54,9 @@ var DrogonQuest = {
 			}
 
 			/**
-			 * Direction drogon is facing
+			 * Direction Drogon is facing
 			 */
-			, direction = ArrowDirections.ArrowRight
+			, direction
 
 			/**
 			 * Grid block size
@@ -73,7 +79,7 @@ var DrogonQuest = {
 			, windowHeight
 
 			/**
-			 * Indicates if drogon got stabbed by NK
+			 * Indicates if drogon got stabbed by NK(ideea, ideea)
 			 */
 			, youDied = false
 
@@ -91,11 +97,6 @@ var DrogonQuest = {
 			 * Canvas context for drogon and food
 			 */
 			, ctx
-
-			/**
-			 * Indicates if the square pozition in grid is even
-			 */
-			, evenSquare = true
 
 			/**
 			 * Even square color
@@ -125,21 +126,27 @@ var DrogonQuest = {
 			, m = getElementById('m')
 
 			/**
+			 * Toggles the message display
+			 */
+			, toggleMessage = function () {
+				m.classList.toggle('n');
+			}
+
+			/**
 			 * Sets event listeners on the DOM
 			 */
 			, registerDOMEventListeners = function () {
 				document.addEventListener('keydown', setDirection);
 				document.addEventListener('mousedown', () => {
 					if (youDied) {
-						drogon = [[x, y], [80, y], [y, y]];
-						drogonPosition = [x, y];
-						direction = ArrowDirections.ArrowRight;
-						eatenGoats = 0;
-						youDied = false;
+						ctx.clearRect(0, 0, canvas.width, canvas.height);
+						restoreInitialData();
+						toggleMessage();
+
 						generateFood();
+					} else if (deathCount++ < 1) {
+						toggleMessage();
 						startGame();
-					} else if (deathCount < 0) {
-						displayMessage();
 					}
 				})
 			}
@@ -187,6 +194,9 @@ var DrogonQuest = {
 				ctx.fillRect(posX, posY, width, height);
 			}
 
+			/**
+			 * Displays a message, depending on the death count
+			 */
 			, displayMessage = function () {
 				let message;
 				let children = m.children;
@@ -200,17 +210,33 @@ var DrogonQuest = {
 				children[0].innerText = message;
 				children[2].innerText = 'Click to continue';
 
-				m.classList.toggle('zn');
+				toggleMessage();
 			}
 
-			, findDrogon = function (path) {
+			/**
+			 * Returns a image path
+			 * @param {string} image name
+			 */
+			, getImagePath = function (path) {
+				return `./${path}.png`;
+			}
+
+			/**
+			 * Loads Drogon head as a image and renders it
+			 * @param {string} imageName image name
+			 */
+			, findDrogon = function (imageName) {
 				drogonHead.onload = renderDrogon;
-				drogonHead.src = `./${path}.png`;
+				drogonHead.src = getImagePath(imageName);
 			}
 
-			, catchGoat = function (path) {
+			/**
+			 * Loads a goat as a image and renders it
+			 * @param {string} imageName image name
+			 */
+			, catchGoat = function (imageName) {
 				goat.onload = generateFood;
-				goat.src = `./${path}.png`;
+				goat.src = getImagePath(imageName);
 			}
 
 			/**
@@ -225,7 +251,7 @@ var DrogonQuest = {
 				ctx.fillStyle = oddSquareColor;
 				ctx.fillRect(x, y, windowWidth, windowHeight);
 
-				for (let i = 0; i < squaresVertical; i++) {
+				for (let i = 0; i <= squaresVertical; i++) {
 					for (let j = 0; j < squaresHorizontal; j++) {
 
 						if ((i + j) % 2 == 0) {
@@ -244,53 +270,42 @@ var DrogonQuest = {
 			 * Renders Drogon
 			 */
 			, renderDrogon = function () {
-				if (youDied) return;
-
 				// add new position on top of the array
 				drogon.splice(0, 0, [drogonPosition[0], drogonPosition[1]]);
 
-				// draw head
-				ctx.drawImage(drogonHead, drogon[0][0], drogon[0][1], squareSize, squareSize);
+				// draw head drogon[0][0], drogon[0][1]
+				ctx.drawImage(drogonHead, drogonPosition[0], drogonPosition[1], squareSize, squareSize);
 
-				// draw the rest of the body
-				let drogonLength = drogon.length;
-				for (let i = 1; i < drogonLength; i++) {
-					let part = drogon[i];
-					createRectangle(part[0], part[1], squareSize, squareSize, '#962938');
-				}
+				/**
+				 * draw the rest of the body
+				 * shenanigans here... the full initial body will be drawn after 3 interval cycles
+				 * ze user will not notice :D
+				 * this will allow us to draw only 3 squares for the body on each cycle
+				 * performance man! (⌐□_□)
+				 */
+				createRectangle(drogon[1][0], drogon[1][1], squareSize, squareSize, '#962938');
 
 				// remove last element
 				let last = drogon.pop();
-				let selectedColor;
 
-				selectedColor = evenSquare ? evenSquareColor : oddSquareColor;
-				evenSquare = !evenSquare;
+				// check the color of the grass after Drogon stepped on it
+				// 40 = 2 * squareSize
+				let even = (last[0] + last[1]) % 40 === 0
+				let selectedColor = even ? evenSquareColor : oddSquareColor;
 
+				// replace tail position with a square of the specific color
 				createRectangle(last[0], last[1], squareSize, squareSize, selectedColor);
 			}
 
 			, gameOver = function () {
-				// improve this
-				// allows drogon to phase through walls 
-				if (drogonPosition[0] === canvas.width && direction === ArrowDirections.ArrowRight) {
-					drogonPosition[0] = 0;
-				} else if (drogonPosition[1] === canvas.height && direction === ArrowDirections.ArrowDown) {
-					drogonPosition[1] = 0;
-				} else if (drogonPosition[1] === -offset && direction === ArrowDirections.ArrowUp) {
-					drogonPosition[1] = canvas.height;
-				} else if (drogonPosition[0] === -offset && direction === ArrowDirections.ArrowLeft) {
-					drogonPosition[0] = canvas.width;
-				}
-
 				// can't get lower than 3 blocks
-				for (let i = 3; i < drogon.length; i++) {
-					const body = drogon[i];
+				for (let i = 2; i < drogon.length; i++) {
+					let body = drogon[i];
 					if (drogonPosition[0] === body[0] && drogonPosition[1] === body[1]) {
 						youDied = true;
-						deathCount++;
 
+						//clearInterval(step);
 						displayMessage();
-						clearInterval(step);
 						break;
 					}
 				}
@@ -300,8 +315,6 @@ var DrogonQuest = {
 			 * Moves drogon position the the selected direction
 			 */
 			, moveDrogon = function () {
-				if (youDied) return;
-
 				switch (direction) {
 					case ArrowDirections.ArrowDown:
 						drogonPosition[1] += squareSize;
@@ -315,8 +328,18 @@ var DrogonQuest = {
 					case ArrowDirections.ArrowRight:
 						drogonPosition[0] += squareSize;
 						break;
-					default:
-						return;
+				}
+
+				// try to improve this
+				// allows drogon to phase through walls
+				if (drogonPosition[0] === windowWidth && direction === ArrowDirections.ArrowRight) {
+					drogonPosition[0] = 0;
+				} else if (drogonPosition[1] === windowHeight && direction === ArrowDirections.ArrowDown) {
+					drogonPosition[1] = 0;
+				} else if (drogonPosition[1] < 0 && direction === ArrowDirections.ArrowUp) {
+					drogonPosition[1] = windowHeight - squareSize;
+				} else if (drogonPosition[0] < 0 && direction === ArrowDirections.ArrowLeft) {
+					drogonPosition[0] = windowWidth - squareSize;
 				}
 
 				gameOver();
@@ -325,8 +348,8 @@ var DrogonQuest = {
 			, generateFood = function () {
 				// ToDo: do not generate food on top of drogon :/
 				foodPosition = [
-					Math.floor(Math.random() * canvas.width / squareSize) * squareSize,
-					Math.floor(Math.random() * canvas.height / squareSize) * squareSize
+					Math.floor(Math.random() * windowWidth / squareSize) * squareSize,
+					Math.floor(Math.random() * windowHeight / squareSize) * squareSize
 				];
 				ctx.drawImage(goat, foodPosition[0], foodPosition[1], squareSize, squareSize);
 			}
@@ -344,6 +367,16 @@ var DrogonQuest = {
 				}
 			}
 
+			/**
+			 * Sets some variables to their initial state
+			 */
+			, restoreInitialData = function () {
+				drogon = [[x, y], [80, y], [y, y]];
+				drogonPosition = [x, y];
+				direction = ArrowDirections.ArrowRight;
+				eatenGoats = 0;
+				youDied = false;
+			}
 
 			/**
 			 * Sets drogon direction based on keycode
@@ -381,11 +414,16 @@ var DrogonQuest = {
 				}
 			}
 
+			/**
+			 * Starts the main game loop
+			 */
 			, startGame = function () {
 				step = setInterval(() => {
-					renderDrogon();
-					moveDrogon();
-					eatFood();
+					if (!youDied) {
+						renderDrogon();
+						moveDrogon();
+						eatFood();
+					}
 				}, 33);
 			}
 
@@ -393,6 +431,7 @@ var DrogonQuest = {
 		initializeWorld = function () {
 			registerDOMEventListeners();
 			computeWindowBoundaries();
+			restoreInitialData();
 
 			// draw the background canvas grid
 			drawBoard(getCanvas2DContext(getAndInitializeCanvas('b')));
@@ -404,8 +443,6 @@ var DrogonQuest = {
 			findDrogon('d');
 
 			displayMessage();
-
-			startGame();
 		};
 
 		return {
