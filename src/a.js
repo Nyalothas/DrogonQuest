@@ -6,12 +6,12 @@ var DrogonQuest = {
 			/**
 			 * Drogon starting x coord position
 			 */
-			x = 100
+			posX = 100
 
 			/**
 			 * Drogon starting y coord position
 			 */
-			, y = 60
+			, posY = 60
 
 			/**
 			 * Drogon body
@@ -81,7 +81,7 @@ var DrogonQuest = {
 			/**
 			 * Indicates if drogon got stabbed by NK(ideea, ideea)
 			 */
-			, youDied = false
+			, youDied
 
 			/**
 			 * How many times you got lost
@@ -107,11 +107,6 @@ var DrogonQuest = {
 			 * Odd Square color
 			 */
 			, oddSquareColor = '#2cb251'
-
-			/**
-			 * Stores the setInterval reference id
-			 */
-			, step
 
 			/**
 			 * Returns the matching element by id
@@ -140,7 +135,7 @@ var DrogonQuest = {
 				document.addEventListener('mousedown', () => {
 					if (youDied) {
 						ctx.clearRect(0, 0, canvas.width, canvas.height);
-						restoreInitialData();
+						setInitialData();
 						toggleMessage();
 
 						generateFood();
@@ -148,7 +143,7 @@ var DrogonQuest = {
 						toggleMessage();
 						startGame();
 					}
-				})
+				});
 			}
 
 			/**
@@ -187,11 +182,26 @@ var DrogonQuest = {
 			}
 
 			/**
-			 * Draws a rectangle on the canvas
+			 * Draws a rectangle on the canvas at the specified coordinate
+			 * @param { object } ctx canvas 2d context
+			 * @param { number } x x coordinate
+			 * @param { number } y y coordinate
+			 * @param { string } color the color in which the rectangle will be drawn
+			 * @param { number } size the size of the square
 			 */
-			, createRectangle = function (posX, posY, width, height, color) {
+			, createRectangle = function (ctx, x, y, color, size = squareSize) {
 				ctx.fillStyle = color;
-				ctx.fillRect(posX, posY, width, height);
+				ctx.fillRect(x, y, size, size);
+			}
+
+			/**
+			 * Draws an image on the canvas at the specified coordinate
+			 * @param { object } image the image to draw
+			 * @param { number } x x coordinate
+			 * @param { number } y y coordinate
+			 */
+			, drawCanvasImage = function (image, coords) {
+				ctx.drawImage(image, coords[0], coords[1], squareSize, squareSize);
 			}
 
 			/**
@@ -208,9 +218,17 @@ var DrogonQuest = {
 				}
 
 				children[0].innerText = message;
-				children[2].innerText = 'Click to continue';
 
 				toggleMessage();
+			}
+
+			/**
+			 * Removes duplicate values from a sorted array
+			 */
+			, getArrayUniqueValues = function (array) {
+				return array.filter((el, index, ar) => {
+					return !index || el != ar[index - 1];
+				});
 			}
 
 			/**
@@ -241,6 +259,7 @@ var DrogonQuest = {
 
 			/**
 			 * Draws a grid on the provided canvas 2d context
+			 * Can we do this with a single for???
 			 * @param { object } ctx the canvas 2d context
 			 */
 			, drawBoard = function (ctx) {
@@ -255,8 +274,7 @@ var DrogonQuest = {
 					for (let j = 0; j < squaresHorizontal; j++) {
 
 						if ((i + j) % 2 == 0) {
-							ctx.fillStyle = evenSquareColor;
-							ctx.fillRect(x, y, squareSize, squareSize);
+							createRectangle(ctx, x, y, evenSquareColor);
 						}
 
 						x += squareSize;
@@ -274,7 +292,7 @@ var DrogonQuest = {
 				drogon.splice(0, 0, [drogonPosition[0], drogonPosition[1]]);
 
 				// draw head drogon[0][0], drogon[0][1]
-				ctx.drawImage(drogonHead, drogonPosition[0], drogonPosition[1], squareSize, squareSize);
+				drawCanvasImage(drogonHead, drogonPosition);
 
 				/**
 				 * draw the rest of the body
@@ -283,20 +301,22 @@ var DrogonQuest = {
 				 * this will allow us to draw only 3 squares for the body on each cycle
 				 * performance man! (⌐□_□)
 				 */
-				createRectangle(drogon[1][0], drogon[1][1], squareSize, squareSize, '#962938');
+				createRectangle(ctx, drogon[1][0], drogon[1][1], '#962938');
 
 				// remove last element
 				let last = drogon.pop();
 
 				// check the color of the grass after Drogon stepped on it
-				// 40 = 2 * squareSize
-				let even = (last[0] + last[1]) % 40 === 0
+				let even = (last[0] + last[1]) % (2 * squareSize) === 0
 				let selectedColor = even ? evenSquareColor : oddSquareColor;
 
 				// replace tail position with a square of the specific color
-				createRectangle(last[0], last[1], squareSize, squareSize, selectedColor);
+				createRectangle(ctx, last[0], last[1], selectedColor);
 			}
 
+			/**
+			 * Sets the way in which the game can end
+			 */
 			, gameOver = function () {
 				// can't get lower than 3 blocks
 				for (let i = 2; i < drogon.length; i++) {
@@ -304,7 +324,6 @@ var DrogonQuest = {
 					if (drogonPosition[0] === body[0] && drogonPosition[1] === body[1]) {
 						youDied = true;
 
-						//clearInterval(step);
 						displayMessage();
 						break;
 					}
@@ -345,13 +364,36 @@ var DrogonQuest = {
 				gameOver();
 			}
 
+			/**
+			 * Generates a number not present in an array
+			 * @param { number } param a formula specific number
+			 * @param { array } array an array with numbers
+			 */
+			, generateRandomNumberNotInArray = function (param, array) {
+				let rand = null;
+
+				while (rand === null || array.indexOf(rand) >= 0) {
+					rand = Math.floor(Math.random() * param / squareSize) * squareSize;
+				}
+				return rand;
+			}
+
+			/**
+			 * Generated a goat
+			 */
 			, generateFood = function () {
-				// ToDo: do not generate food on top of drogon :/
+				// flat Drogon and sort it
+				let flatDrogon = drogon.reduce((acc, val) => acc.concat(val)).sort();
+
+				// remove unique values
+				flatDrogon = getArrayUniqueValues(flatDrogon);
+
 				foodPosition = [
-					Math.floor(Math.random() * windowWidth / squareSize) * squareSize,
-					Math.floor(Math.random() * windowHeight / squareSize) * squareSize
+					generateRandomNumberNotInArray(windowWidth, flatDrogon),
+					generateRandomNumberNotInArray(windowHeight, flatDrogon)
 				];
-				ctx.drawImage(goat, foodPosition[0], foodPosition[1], squareSize, squareSize);
+
+				drawCanvasImage(goat, foodPosition);
 			}
 
 			/**
@@ -370,9 +412,9 @@ var DrogonQuest = {
 			/**
 			 * Sets some variables to their initial state
 			 */
-			, restoreInitialData = function () {
-				drogon = [[x, y], [80, y], [y, y]];
-				drogonPosition = [x, y];
+			, setInitialData = function () {
+				drogon = [[posX, posY], [80, posY], [posY, posY]];
+				drogonPosition = [posX, posY];
 				direction = ArrowDirections.ArrowRight;
 				eatenGoats = 0;
 				youDied = false;
@@ -409,8 +451,6 @@ var DrogonQuest = {
 							direction = ArrowDirections.ArrowRight;
 						}
 						break;
-					default:
-						break;
 				}
 			}
 
@@ -418,7 +458,7 @@ var DrogonQuest = {
 			 * Starts the main game loop
 			 */
 			, startGame = function () {
-				step = setInterval(() => {
+				setInterval(() => {
 					if (!youDied) {
 						renderDrogon();
 						moveDrogon();
@@ -427,23 +467,25 @@ var DrogonQuest = {
 				}, 33);
 			}
 
+			/**
+			 * Initializes and starts the application
+			 */
+			, initializeWorld = function () {
+				registerDOMEventListeners();
+				computeWindowBoundaries();
+				setInitialData();
 
-		initializeWorld = function () {
-			registerDOMEventListeners();
-			computeWindowBoundaries();
-			restoreInitialData();
+				// draw the background canvas grid
+				drawBoard(getCanvas2DContext(getAndInitializeCanvas('b')));
 
-			// draw the background canvas grid
-			drawBoard(getCanvas2DContext(getAndInitializeCanvas('b')));
+				canvas = getAndInitializeCanvas('f');
+				ctx = getCanvas2DContext(canvas);
 
-			canvas = getAndInitializeCanvas('f');
-			ctx = getCanvas2DContext(canvas);
+				catchGoat('g');
+				findDrogon('d');
 
-			catchGoat('g');
-			findDrogon('d');
-
-			displayMessage();
-		};
+				displayMessage();
+			};
 
 		return {
 			init: initializeWorld()
